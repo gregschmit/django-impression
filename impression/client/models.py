@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.utils import OperationalError
+from django.db.utils import Error as DBError
 
 from ..settings import get_setting
 
@@ -30,7 +30,7 @@ class RemoteImpressionServer(models.Model):
             server = cls.objects.filter(is_active=True)
             if server:
                 return (server[0].target, server[0].authentication_token)
-        except OperationalError:  # database not being used; default to settings.py
+        except DBError:  # database not being used; default to settings.py
             pass
 
         # return defaults

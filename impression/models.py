@@ -167,6 +167,12 @@ class Distribution(models.Model):
         return self.name
 
 
+# class RateLimit(models.Model):
+#     """
+#     Represents a rate limit for sending emails to a service.
+#     """
+
+
 class Service(models.Model):
     """
     A combination of a template and email addresses/distributions that defines a target

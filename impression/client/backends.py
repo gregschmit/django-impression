@@ -6,7 +6,6 @@ import requests
 
 from django.core.mail.backends.base import BaseEmailBackend
 
-from .models import RemoteImpressionServer
 from ..settings import get_setting
 
 
@@ -23,8 +22,16 @@ class RemoteEmailBackend(BaseEmailBackend):
         """
         Send a RESTful request to the target impression server and return the response.
         """
-        # get target and build headers
-        target, token = RemoteImpressionServer.get_target_and_token()
+        # get target/token
+        try:
+            from .models import RemoteImpressionServer
+
+            target, token = RemoteImpressionServer.get_target_and_token()
+        except RuntimeError:
+            target = get_setting("IMPRESSION_DEFAULT_TARGET")
+            token = get_setting("IMPRESSION_DEFAULT_TOKEN")
+
+        # build headers
         headers = {"Authorization": "Token {}".format(token)}
 
         # determine if we should interpret the first address in "to" as the service

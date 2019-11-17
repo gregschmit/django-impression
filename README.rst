@@ -82,9 +82,16 @@ Installation
 Configuration
 *************
 
-Whether you are going to run Impression from your existing project or integrate your
-existing project with a standalone Impression system affects how you should configure
+Whether you are going to run Impression from your existing project locally, or whether
+you are going to integrate your existing project with a standalone Impression system: affects how you should configure
 the settings.
+
+There are 2 configuration schemes:
+
+- Local: You wish to send emails from a project that has Impression integrated into it.
+- Remote: You wish to send email remotely via the REST API of an Impression instance
+  running in another project. (For our purposes, "Remote" means on another system, or
+  even another project running on the same system, in which case you'll use localhost.)
 
 Local
 =====
@@ -111,10 +118,10 @@ just add this entry to your URL dispatcher's ``urlpatterns`` list:
 Remote
 ------
 
-For remote systems that will talk to your primary Impression server over the REST API,
-then do not include ``impression`` in your ``INSTALLED_APPS``, but do add
-``django-impression`` to your requirements to ensure it's installed in the environment.
-Configure your settings like this:
+For remote systems that will talk to your Impression server over the REST API, then do
+not include ``impression`` in your ``INSTALLED_APPS``, but do add ``django-impression``
+to your requirements to ensure it's installed in the environment. Configure your
+settings like this:
 
 .. code-block:: python
 
