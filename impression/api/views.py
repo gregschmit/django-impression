@@ -27,7 +27,6 @@ class SendMessageAPIView(APIView):
         service is defined in the URL parameter, then the service in the request data
         will be ignored.
         """
-        print("TEST")
 
         # extract service name
         if "service_name" in self.kwargs:
@@ -43,7 +42,6 @@ class SendMessageAPIView(APIView):
         try:
             service = Service.objects.get(name=service_name)
         except (Service.DoesNotExist, ValueError, TypeError):
-            print("TESTBAD")
             raise ParseError("Target service not found.")
 
         # check for service-level permissions

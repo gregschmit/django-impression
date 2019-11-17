@@ -29,6 +29,7 @@ IMPRESSION_DEFAULT_TARGET = "http://127.0.0.1:8000/api/send_message/"
 IMPRESSION_DEFAULT_TOKEN = ""
 
 EMAIL_BACKEND = "impression.backends.LocalEmailBackend"
+# EMAIL_BACKEND = "impression.client.backends.RemoteEmailBackend"  # for testing the API
 
 
 # standalone settings
