@@ -1,5 +1,5 @@
 Impression - The CMS For Email
-==============================
+##############################
 
 .. image:: https://travis-ci.org/gregschmit/django-impression.svg?branch=master
     :alt: TravisCI
@@ -46,7 +46,7 @@ Impression in an existing project, or you can run it standalone by itself (e.g.,
 
 
 Architectures
-=============
+#############
 
 There are a few ways to integrate Impression into an environment:
 
@@ -72,56 +72,44 @@ There are a few ways to integrate Impression into an environment:
 
 
 Installation
-============
+############
 
 .. code-block:: shell
 
     $ pip install django-impression
 
 
-Installing Using Docker
------------------------
+Configuration
+*************
 
-blah blah blah
+Whether you are going to run Impression from your existing project or integrate your
+existing project with a standalone Impression system affects how you should configure
+the settings.
 
-
-Primary System (manual install)
--------------------------------
-
-You can deploy the Dockerfile to a container,
+Local
+=====
 
 Add ``impression`` to your ``INSTALLED_APPS``, run migrations, and configure some
 settings:
 
 .. code-block:: python
 
-    # this should be your *actual* email backend
+    # This should be your *actual* email backend.
     IMPRESSION_EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+    # this is configured to pass emails to Impression.
     EMAIL_BACKEND = "impression.backends.LocalEmailBackend"
 
-To hook the API endpoint ``/api/send_message`` into your project, just add this entry to
-your URL configuration's ``urlpatterns`` list:
+To hook the API endpoint ``/api/send_message`` into your project for remote systems,
+just add this entry to your URL dispatcher's ``urlpatterns`` list:
 
 .. code-block:: python
 
     path("api/", include("impression.api.urls")),  # includes the send_message endpoint
 
-If you want to have the Impression branded Admin UI, add this to your URL config in
-place of your normal admin URLs:
 
-.. code-block:: python
-
-    from impression.admin_ui.sites import custom_admin_site
-    urlpatterns = [
-        path("admin/", custom_admin_site.urls),
-        ...
-    ]
-
-Also, include ``impression.admin_ui`` in your INSTALLED_APPS.
-
-
-Other Applications
-------------------
+Remote
+------
 
 For remote systems that will talk to your primary Impression server over the REST API,
 then do not include ``impression`` in your ``INSTALLED_APPS``, but do add
@@ -134,12 +122,25 @@ Configure your settings like this:
     IMPRESSION_DEFAULT_TARGET = "https://impression.example.org/api/send_message/"
     IMPRESSION_DEFAULT_TOKEN = "my_api_auth_token_here"
 
-If you want to store your credentials in the database, include ``impression.client`` in
-your ``INSTALLED_APPS``, then run database migrations.
+If you want to store your credentials in the database rather than statically in your
+project ``settings.py`` file, include ``impression.client`` in your ``INSTALLED_APPS``,
+then run database migrations, and finally remove the ``IMPRESSION_DEFAULT_TARGET`` and
+``IMPRESSION_DEFAULT_TOKEN`` from your project ``settings.py``.
 
 
-Configuration
-=============
+Installing as Standalone System (+Docker)
+=========================================
+
+To make things really easy, if you have a Docker or Virtual environment, or just wish to
+spin Impression up on it's own server, you can check out
+`Impression Sys <https://github.com/gregschmit/impression_sys>`_ to deploy Impression as
+a standalone system. That project provides the ability to configure everything about the
+system in the Admin UI, and even configure Let's Encrypt certificates to ensure your
+email API is secure.
+
+
+Model Configuration
+###################
 
 To get familiar with Impression models, here is a quick guide on which models to visit
 first, in order:
@@ -158,11 +159,12 @@ first, in order:
    `Bootstrap <https://bootstrapemail.com>`_ or
    `Foundation <https://foundation.zurb.com/emails.html>`_.
 4) Now you can either send email with Django's ``send_mail``, and remote systems can
-   use ``send_mail`` to reach your Impression server.
+   use ``send_mail`` to reach your Impression server, provided they have followed the
+   configuration instructions above.
 
 
 Tests
-=====
+#####
 
 .. code-block:: shell
 
