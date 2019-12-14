@@ -11,6 +11,7 @@ from django.template.context import Context
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from .exceptions import RateLimitException
 from .settings import get_setting
 from .template_engine import ImpressionTemplateEngine
 
@@ -22,7 +23,7 @@ class EmailAddress(models.Model):
 
     email_address = models.EmailField(unique=True)
     service_unsubscriptions = models.ManyToManyField("impression.Service", blank=True)
-    unsubscribed = models.BooleanField(
+    unsubscribed_from_all = models.BooleanField(
         default=False,
         help_text=_("Email is unsubscribed from everything."),
         db_index=True,
@@ -34,25 +35,46 @@ class EmailAddress(models.Model):
     def __str__(self):
         return self.email_address
 
+    def is_unsubscribed_from(self, service):
+        """
+        This is a helper method that returns whether a user is unsubscribed from a
+        particular service, or ``True`` for all services if this user is unsubscribed
+        from everything.
+        """
+        return self.unsubscribed_from_all or (
+            service in self.service_unsubscriptions.all()
+        )
+
     @classmethod
     def convert_emails(cls, emails):
         """
         Given a list of email strings, try to get an email object or create one, and
         ignore invalid emails, and return a list of the resulting email objects.
         """
-        r = []
+        email_list = []
         for email in emails:
             try:
-                r.append(cls.objects.get(email_address=email))
+                email_list.append(cls.objects.get(email_address=email))
             except cls.DoesNotExist:
                 e = cls(email_address=email)
+                if get_setting("IMPRESSION_DEFAULT_UNSUBSCRIBED"):
+                    e.unsubscribed_from_all = True
                 try:
                     e.full_clean()
                     e.save()
-                    r.append(e)
+                    email_list.append(e)
                 except ValidationError:
                     pass
-        return r
+        return email_list
+
+    @staticmethod
+    def filter_unsubscribed(emails, service):
+        """
+        Filter out emails which are unsubscribed
+        """
+        if service.is_unsubscribable:
+            return [e for e in emails if not e.is_unsubscribed_from(service)]
+        return emails
 
     @staticmethod
     def extract_display_email(email):
@@ -77,7 +99,6 @@ class DefaultTemplate:
         """
         Render a template from just subject and body.
         """
-        # build engine and evaluate/return
         engine = ImpressionTemplateEngine()
         return (
             DjangoTemplate("{{ subject }}", engine=engine).render(context),
@@ -96,8 +117,8 @@ class Template(models.Model):
         code="invalid_name_format",
     )
     name = models.CharField(max_length=255, unique=True, validators=[name_validator])
-    subject = models.CharField(max_length=255, blank=True)
-    body = models.TextField(blank=True)
+    subject = models.CharField(max_length=255, blank=True, default="{{ subject }}")
+    body = models.TextField(blank=True, default="{{ body }}")
     extends = models.ForeignKey(
         "self",
         blank=True,
@@ -131,7 +152,6 @@ class Template(models.Model):
         Shortcut for rendering this template with a context. This will return a tuple in
         the form ``(subject, body)``.
         """
-        # build engine and evaluate/return
         engine = ImpressionTemplateEngine()
         return (
             DjangoTemplate(self.subject, engine=engine).render(context),
@@ -167,10 +187,95 @@ class Distribution(models.Model):
         return self.name
 
 
-# class RateLimit(models.Model):
-#     """
-#     Represents a rate limit for sending emails to a service.
-#     """
+class RateLimit(models.Model):
+    """
+    A definition for a rate limit on a service.
+    """
+
+    name = models.CharField(max_length=255, unique=True)
+    quantity = models.PositiveIntegerField(
+        default=1,
+        help_text=_(
+            "The number of messages which can be sent to the service in the given time "
+            "period (either block or rolling window)."
+        ),
+    )
+    BLOCK = 0
+    ROLLING_WINDOW = 1
+    TYPE_CHOICES = (
+        (BLOCK, "Block"),
+        (ROLLING_WINDOW, "Rolling Window"),
+    )
+    type = models.PositiveIntegerField(choices=TYPE_CHOICES, default=BLOCK)
+    HOUR = 0
+    DAY = 1
+    WEEK = 2
+    MONTH = 3
+    BLOCK_CHOICES = (
+        (HOUR, "per hour"),
+        (DAY, "per day"),
+        (WEEK, "per week"),
+        (MONTH, "per month"),
+    )
+    BLOCK_NAME = {id: name for id, name in BLOCK_CHOICES}
+    block = models.PositiveIntegerField(choices=BLOCK_CHOICES, default=HOUR)
+    rolling_window = models.DurationField(default=timezone.timedelta(hours=1))
+
+    def __str__(self):
+        return self.name
+
+    def get_period(self, now=None):
+        """
+        Get a start and end datetime object (timezone aware) for the period of time we
+        should be investigating for rate limit violations. If `now` is provided, use
+        that, otherwise, use `timezone.now()``.
+
+        This should return a tuple in the form (start_dt, end_dt).
+        """
+        if not now:
+            now = timezone.now()
+        if self.type == self.ROLLING_WINDOW:
+            return (now - self.rolling_window, now)
+        elif self.type == self.BLOCK:
+            then = now.replace(microsecond=0, second=0, minute=0)
+            if self.block == self.HOUR:
+                return (then, now)
+            else:
+                then = then.replace(hour=0)
+                if self.block == self.DAY:
+                    return (then, now)
+                else:
+                    then = then.replace(hour=0, day=then.day - then.isoweekday())
+                    if self.block == self.WEEK:
+                        return (then, now)
+                    else:
+                        then = then.replace(day=1)
+                        if self.block == self.MONTH:
+                            return (then, now)
+        raise Exception("RateLimit type or block not known.")
+
+    def humanized_rolling_window(self):
+        """
+        Human-readable summary of the rolling window.
+        """
+        minutes = self.rolling_window.seconds // 60
+        remaining_seconds = self.rolling_window.seconds % 60
+        hours = minutes // 60
+        remaining_minutes = minutes % 60
+        return "{} days, {} hours, {} minutes, {} seconds".format(
+            self.rolling_window.days, hours, remaining_minutes, remaining_seconds
+        )
+
+    def rule(self):
+        """
+        Human-readable summary of this rate limit rule.
+        """
+        if self.type == self.BLOCK:
+            return "{} messages {}".format(self.quantity, self.BLOCK_NAME[self.block])
+        if self.type == self.ROLLING_WINDOW:
+            return "{} messages for a rolling window of: {}".format(
+                self.quantity, self.humanized_rolling_window()
+            )
 
 
 class Service(models.Model):
@@ -190,12 +295,25 @@ class Service(models.Model):
         max_length=255,
         validators=[name_validator],
         unique=True,
-        verbose_name="(URL Safe) Name",
+        verbose_name="Name (URL Safe)",
         help_text=_(
             "Name must only contain lowercase letters, numbers, and underscores"
         ),
     )
     is_active = models.BooleanField(default=True, db_index=True)
+    is_unsubscribable = models.BooleanField(
+        default=True,
+        help_text=_(
+            "Disabling this option will send emails to users even if they are "
+            "unsubscribed to this service. You should only use this for emails which "
+            "are not periodic. A good example might be a service for order "
+            "confirmations, where the concept of 'unsubscribing' to those emails is "
+            "not sensible."
+        ),
+    )
+    rate_limit = models.ForeignKey(
+        RateLimit, blank=True, null=True, on_delete=models.SET_NULL
+    )
     allowed_groups = models.ManyToManyField(
         Group,
         blank=True,
@@ -225,7 +343,7 @@ class Service(models.Model):
         verbose_name="Allow JSON body",
     )
     template = models.ForeignKey(
-        Template, default=None, blank=True, null=True, on_delete=models.SET_NULL
+        Template, blank=True, null=True, on_delete=models.SET_NULL
     )
     from_email_address = models.ForeignKey(
         EmailAddress,
@@ -297,6 +415,15 @@ class Service(models.Model):
         """
         return self.template or DefaultTemplate()
 
+    def get_messages_in_rate_limit_period(self):
+        """
+        Return a queryset of messages within the rate limiting period.
+        """
+        if not self.rate_limit:
+            return None
+        (then, now) = self.rate_limit.get_period()
+        return self.messages.filter(created__gte=then, created__lte=now)
+
 
 class Message(models.Model):
     """
@@ -311,7 +438,9 @@ class Message(models.Model):
             "to the service."
         ),
     )
-    service = models.ForeignKey(Service, on_delete=models.CASCADE)
+    service = models.ForeignKey(
+        Service, on_delete=models.CASCADE, related_name="messages"
+    )
     override_from_email_address = models.ForeignKey(
         EmailAddress,
         blank=True,
@@ -341,8 +470,8 @@ class Message(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
     ready_to_send = models.BooleanField(default=False)
-    sent = models.DateTimeField(default=None, blank=True, null=True)
-    last_attempt = models.DateTimeField(default=None, blank=True, null=True)
+    sent = models.DateTimeField(blank=True, null=True)
+    last_attempt = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return str(self.id)
@@ -352,6 +481,12 @@ class Message(models.Model):
         Save the message. Then, if it looks ready to send, acquire DB lock, and send
         the message.
         """
+        # check if we hit our rate limit
+        if self.pk is None and self.service.rate_limit:
+            qty = self.service.get_messages_in_rate_limit_period().count()
+            if qty > self.service.rate_limit.quantity:
+                raise RateLimitException()
+
         # save object first
         super().save(*args, **kwargs)
 

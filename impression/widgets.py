@@ -1,5 +1,5 @@
 from django import forms
-from django.contrib.staticfiles.templatetags.staticfiles import static
+from django.templatetags.static import static
 
 
 class BaseEditorWidget(forms.Textarea):

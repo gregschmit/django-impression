@@ -2,8 +2,6 @@
 This module implements our local email backend.
 """
 
-import requests
-
 from django.core.mail.backends.base import BaseEmailBackend
 
 from .models import EmailAddress, Message, Service
@@ -24,9 +22,11 @@ class LocalEmailBackend(BaseEmailBackend):
         """
         # extract FROM email
         if message.from_email:
-            from_email, _ = EmailAddress.objects.get_or_create(
+            from_email, created = EmailAddress.objects.get_or_create(
                 email_address=EmailAddress.extract_display_email(message.from_email)
             )
+            if get_setting("IMPRESSION_DEFAULT_UNSUBSCRIBED") and created:
+                from_email.update(unsubscribed_from_all=True)
         else:
             from_email = None
 
@@ -38,12 +38,21 @@ class LocalEmailBackend(BaseEmailBackend):
             service_name = get_setting("IMPRESSION_DEFAULT_SERVICE")
             to_emails = message.to
 
-        # parse emails and build message
-        to_l = EmailAddress.convert_emails(to_emails or [])
-        cc_l = EmailAddress.convert_emails(message.cc or [])
-        bcc_l = EmailAddress.convert_emails(message.bcc or [])
+        # get service, parse/filter emails
+        service = Service.objects.get(name=service_name)
+        to_l = EmailAddress.filter_unsubscribed(
+            EmailAddress.convert_emails(to_emails or []), service
+        )
+        cc_l = EmailAddress.filter_unsubscribed(
+            EmailAddress.convert_emails(message.cc or []), service
+        )
+        bcc_l = EmailAddress.filter_unsubscribed(
+            EmailAddress.convert_emails(message.bcc or []), service
+        )
+
+        # build message
         m = Message(
-            service=Service.objects.get(name=service_name),
+            service=service,
             override_from_email_address=from_email,
             subject=message.subject,
             body=message.body,

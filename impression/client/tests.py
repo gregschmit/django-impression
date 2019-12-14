@@ -10,7 +10,6 @@ from django.test import TestCase, override_settings
 
 from .backends import RemoteEmailBackend
 from .models import RemoteImpressionServer
-from ..models import EmailAddress
 
 
 class RemoteImpressionServerTestCase(TestCase):
@@ -68,7 +67,7 @@ class RemoteEmailBackendTestCase(TestCase):
         """
         backend = RemoteEmailBackend()
         message = EmailMessage(**self.example_email, connection=backend)
-        resp = backend.send_message(message)
+        backend.send_message(message)
         self.assertEqual(f.call_count, 1)
         call_args, call_kwargs = f.call_args_list[0]
         self.assertEqual(call_args[0], "http://127.0.0.1:8000/api/send_message/")
@@ -88,7 +87,7 @@ class RemoteEmailBackendTestCase(TestCase):
         backend = RemoteEmailBackend()
         message1 = EmailMessage(**self.example_email, connection=backend)
         message2 = EmailMessage(**self.example_email2, connection=backend)
-        resp = backend.send_messages([message1, message2])
+        backend.send_messages([message1, message2])
         self.assertEqual(f.call_count, 2)
 
         # test first message
@@ -119,7 +118,7 @@ class RemoteEmailBackendTestCase(TestCase):
         """
         Test sending email via Django using the proper setting.
         """
-        resp = send_mail(**self.example_email_for_send_mail)
+        send_mail(**self.example_email_for_send_mail)
         self.assertEqual(f.call_count, 1)
         call_args, call_kwargs = f.call_args_list[0]
         self.assertEqual(call_args[0], "http://127.0.0.1:8000/api/send_message/")

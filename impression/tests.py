@@ -4,14 +4,17 @@ This module is for testing the email models, API, email backends, and template e
 TODO: build more tests for Service and Message models.
 """
 
-from django.test import TestCase
+from unittest import mock
 
-from .models import EmailAddress, Template, Distribution, Service
+from django.test import TestCase
+from django.utils import timezone
+
+from .models import EmailAddress, Template, Distribution, RateLimit, Service
 
 
 class EmailAddressTestCase(TestCase):
     """
-    Test EmailAddress model.
+    Tests for the EmailAddress model.
     """
 
     def setUp(self):
@@ -29,7 +32,7 @@ class EmailAddressTestCase(TestCase):
 
 class TemplateTestCase(TestCase):
     """
-    Test Template model.
+    Tests for the Template model.
     """
 
     def setUp(self):
@@ -49,13 +52,10 @@ class TemplateTestCase(TestCase):
 
 class DistributionTestCase(TestCase):
     """
-    Test Distribution model.
+    Tests for the Distribution model.
     """
 
     def setUp(self):
-        """
-        Build some emails to add to a distribution.
-        """
         self.test1 = EmailAddress.objects.create(email_address="test1@example.org")
         self.test2 = EmailAddress.objects.create(email_address="test2@example.org")
         self.all_emails = set([self.test1, self.test2])
@@ -126,15 +126,79 @@ class DistributionTestCase(TestCase):
         self.assertSetEqual(self.all_emails, set(test_emails))
 
 
-class ServiceTestCase(TestCase):
+class RateLimitTestCase(TestCase):
     """
-    Test Service model.
+    Tests for the RateLimit model.
     """
 
     def setUp(self):
-        """
-        Build some emails to add to a distribution.
-        """
+        self.from_email = EmailAddress.objects.create(email_address="from@example.org")
+        self.test1 = EmailAddress.objects.create(email_address="test1@example.org")
+        self.test2 = EmailAddress.objects.create(email_address="test2@example.org")
+        self.rate_limit = RateLimit.objects.create(
+            name="Test Limit",
+            quantity=2,
+            type=RateLimit.ROLLING_WINDOW,
+            block=RateLimit.HOUR,
+            rolling_window=timezone.timedelta(hours=1),
+        )
+        self.service = Service.objects.create(
+            name="test_service", rate_limit=self.rate_limit
+        )
+
+    @mock.patch("django.utils.timezone.now")
+    def test_get_period_rolling_window(self, mock_now):
+        mock_now.return_value = timezone.datetime(2019, 12, 11, 4, 32, 45)
+        (then, now) = self.rate_limit.get_period()
+        self.assertEqual(then, timezone.datetime(2019, 12, 11, 3, 32, 45))
+        self.assertEqual(now, timezone.datetime(2019, 12, 11, 4, 32, 45))
+
+    @mock.patch("django.utils.timezone.now")
+    def test_get_period_block_hour(self, mock_now):
+        self.rate_limit.type = RateLimit.BLOCK
+        self.rate_limit.save()
+        mock_now.return_value = timezone.datetime(2019, 12, 11, 4, 32, 45)
+        (then, now) = self.rate_limit.get_period()
+        self.assertEqual(then, timezone.datetime(2019, 12, 11, 4, 0, 0))
+        self.assertEqual(now, timezone.datetime(2019, 12, 11, 4, 32, 45))
+
+    @mock.patch("django.utils.timezone.now")
+    def test_get_period_block_day(self, mock_now):
+        self.rate_limit.type = RateLimit.BLOCK
+        self.rate_limit.block = RateLimit.DAY
+        self.rate_limit.save()
+        mock_now.return_value = timezone.datetime(2019, 12, 11, 4, 32, 45)
+        (then, now) = self.rate_limit.get_period()
+        self.assertEqual(then, timezone.datetime(2019, 12, 11, 0, 0, 0))
+        self.assertEqual(now, timezone.datetime(2019, 12, 11, 4, 32, 45))
+
+    @mock.patch("django.utils.timezone.now")
+    def test_get_period_block_week(self, mock_now):
+        self.rate_limit.type = RateLimit.BLOCK
+        self.rate_limit.block = RateLimit.WEEK
+        self.rate_limit.save()
+        mock_now.return_value = timezone.datetime(2019, 12, 11, 4, 32, 45)
+        (then, now) = self.rate_limit.get_period()
+        self.assertEqual(then, timezone.datetime(2019, 12, 8, 0, 0, 0))
+        self.assertEqual(now, timezone.datetime(2019, 12, 11, 4, 32, 45))
+
+    @mock.patch("django.utils.timezone.now")
+    def test_get_period_block_month(self, mock_now):
+        self.rate_limit.type = RateLimit.BLOCK
+        self.rate_limit.block = RateLimit.MONTH
+        self.rate_limit.save()
+        mock_now.return_value = timezone.datetime(2019, 12, 11, 4, 32, 45)
+        (then, now) = self.rate_limit.get_period()
+        self.assertEqual(then, timezone.datetime(2019, 12, 1, 0, 0, 0))
+        self.assertEqual(now, timezone.datetime(2019, 12, 11, 4, 32, 45))
+
+
+class ServiceTestCase(TestCase):
+    """
+    Tests for the Service model.
+    """
+
+    def setUp(self):
         self.from_email = EmailAddress.objects.create(email_address="from@example.org")
         self.test1 = EmailAddress.objects.create(email_address="test1@example.org")
         self.test2 = EmailAddress.objects.create(email_address="test2@example.org")

@@ -1,10 +1,11 @@
 from django.core.exceptions import PermissionDenied
 
 from rest_framework import permissions, status
-from rest_framework.exceptions import ParseError
+from rest_framework.exceptions import NotFound, Throttled
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ..exceptions import RateLimitException
 from ..models import EmailAddress, Message, Service
 
 
@@ -23,9 +24,10 @@ class SendMessageAPIView(APIView):
     def create_message(self, request, *args, **kwargs):
         """
         Create a message attached to a service. The service must either be identified in
-        the URL pattern or in the request data as the variable ``service_name``. If the
-        service is defined in the URL parameter, then the service in the request data
-        will be ignored.
+        the URL pattern, or as a query parameter, or in the request data, all as the
+        variable ``service_name``. The precedance is in that same order, so for example,
+        if the service is defined in the URL parameter, then the service in the request
+        data will be ignored.
         """
 
         # extract service name
@@ -36,13 +38,13 @@ class SendMessageAPIView(APIView):
         elif "service_name" in request.data:
             service_name = request.data.get("service_name")
         else:
-            raise ParseError("Target service name not provided.")
+            raise NotFound("Target service name not provided.")
 
         # resolve to service, or raise error
         try:
             service = Service.objects.get(name=service_name)
         except (Service.DoesNotExist, ValueError, TypeError):
-            raise ParseError("Target service not found.")
+            raise NotFound("Target service not found.")
 
         # check for service-level permissions
         allowed_groups = service.allowed_groups.values_list("pk", flat=True)
@@ -57,15 +59,31 @@ class SendMessageAPIView(APIView):
         )
         from_email = request.data.get("from", None)
         if from_email:
-            message.override_from_email_address, _ = EmailAddress.objects.get_or_create(
+            (
+                message.override_from_email_address,
+                created,
+            ) = EmailAddress.objects.get_or_create(
                 email_address=EmailAddress.extract_display_email(from_email)
             )
-        message.save()
+            if get_setting("IMPRESSION_DEFAULT_UNSUBSCRIBED") and created:
+                message.override_from_email_address.update(unsubscribed_from_all=True)
+
+        # try saving, handling RateLimitException
+        try:
+            message.save()
+        except RateLimitException:
+            raise Throttled(detail="Rate limit has been reached!")
 
         # convert email strings to email objects
-        to_l = EmailAddress.convert_emails(request.data.get("to", []))
-        cc_l = EmailAddress.convert_emails(request.data.get("cc", []))
-        bcc_l = EmailAddress.convert_emails(request.data.get("bcc", []))
+        to_l = EmailAddress.filter_unsubscribed(
+            EmailAddress.convert_emails(request.data.get("to", [])), service
+        )
+        cc_l = EmailAddress.filter_unsubscribed(
+            EmailAddress.convert_emails(request.data.get("cc", [])), service
+        )
+        bcc_l = EmailAddress.filter_unsubscribed(
+            EmailAddress.convert_emails(request.data.get("bcc", [])), service
+        )
 
         # add emails to the message
         message.extra_to_email_addresses.add(*to_l)

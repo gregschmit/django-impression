@@ -8,9 +8,9 @@ from .widgets import TemplateEditorWidget
 
 @admin.register(models.EmailAddress)
 class EmailAddressAdmin(admin.ModelAdmin):
-    list_filter = ("unsubscribed",)
+    list_filter = ("unsubscribed_from_all",)
     search_fields = ("email_address",)
-    list_display = ("email_address", "unsubscribed")
+    list_display = ("email_address", "unsubscribed_from_all")
 
 
 @admin.register(models.Template)
@@ -26,6 +26,16 @@ class DistributionAdmin(admin.ModelAdmin):
     search_fields = list_display = ("name",)
 
 
+@admin.register(models.RateLimit)
+class RateLimitAdmin(admin.ModelAdmin):
+    list_filter = ("name", "type")
+    search_fields = ("name",)
+    list_display = (
+        "name",
+        "rule",
+    )
+
+
 @admin.register(models.Service)
 class ServiceAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "allow_json_body", "template", "from_email_address")
@@ -33,6 +43,7 @@ class ServiceAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "is_active",
+        "is_unsubscribable",
         "allow_json_body",
         "template",
         "from_email_address",

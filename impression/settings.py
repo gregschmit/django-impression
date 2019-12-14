@@ -27,6 +27,7 @@ IMPRESSION_EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 IMPRESSION_DEFAULT_SERVICE = "default"
 IMPRESSION_DEFAULT_TARGET = "http://127.0.0.1:8000/api/send_message/"
 IMPRESSION_DEFAULT_TOKEN = ""
+IMPRESSION_DEFAULT_UNSUBSCRIBED = False
 
 EMAIL_BACKEND = "impression.backends.LocalEmailBackend"
 # EMAIL_BACKEND = "impression.client.backends.RemoteEmailBackend"  # for testing the API

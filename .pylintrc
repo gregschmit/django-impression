@@ -28,9 +28,7 @@ init-import=no
 
 [FORMAT]
 expected-line-ending-format=LF
-ignore-long-lines=^\s*(# )?<?https?://\S+>?$
 indent-string='    '
-max-line-length=100
 max-module-lines=1000
 single-line-class-stmt=yes
 single-line-if-stmt=yes
