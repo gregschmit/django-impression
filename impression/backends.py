@@ -22,11 +22,7 @@ class LocalEmailBackend(BaseEmailBackend):
         """
         # extract FROM email
         if message.from_email:
-            from_email, created = EmailAddress.objects.get_or_create(
-                email_address=EmailAddress.extract_display_email(message.from_email)
-            )
-            if get_setting("IMPRESSION_DEFAULT_UNSUBSCRIBED") and created:
-                from_email.update(unsubscribed_from_all=True)
+            from_email, _ = EmailAddress.get_or_create(message.from_email)
         else:
             from_email = None
 
@@ -38,17 +34,8 @@ class LocalEmailBackend(BaseEmailBackend):
             service_name = get_setting("IMPRESSION_DEFAULT_SERVICE")
             to_emails = message.to
 
-        # get service, parse/filter emails
+        # get service
         service = Service.objects.get(name=service_name)
-        to_l = EmailAddress.filter_unsubscribed(
-            EmailAddress.convert_emails(to_emails or []), service
-        )
-        cc_l = EmailAddress.filter_unsubscribed(
-            EmailAddress.convert_emails(message.cc or []), service
-        )
-        bcc_l = EmailAddress.filter_unsubscribed(
-            EmailAddress.convert_emails(message.bcc or []), service
-        )
 
         # build message
         m = Message(
@@ -58,9 +45,9 @@ class LocalEmailBackend(BaseEmailBackend):
             body=message.body,
         )
         m.save()
-        m.extra_to_email_addresses.add(*to_l)
-        m.extra_cc_email_addresses.add(*cc_l)
-        m.extra_bcc_email_addresses.add(*bcc_l)
+        m.extra_to_email_addresses.add(*EmailAddress.convert_emails(to_emails or []))
+        m.extra_cc_email_addresses.add(*EmailAddress.convert_emails(message.cc or []))
+        m.extra_bcc_email_addresses.add(*EmailAddress.convert_emails(message.bcc or []))
 
         # signal message can be sent
         m.ready_to_send = True

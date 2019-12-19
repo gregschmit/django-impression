@@ -139,7 +139,7 @@ class RateLimitTestCase(TestCase):
             name="Test Limit",
             quantity=2,
             type=RateLimit.ROLLING_WINDOW,
-            block=RateLimit.HOUR,
+            block_period=RateLimit.HOUR,
             rolling_window=timezone.timedelta(hours=1),
         )
         self.service = Service.objects.create(
@@ -147,48 +147,58 @@ class RateLimitTestCase(TestCase):
         )
 
     @mock.patch("django.utils.timezone.now")
-    def test_get_period_rolling_window(self, mock_now):
+    def test_get_timeframe_rolling_window(self, mock_now):
         mock_now.return_value = timezone.datetime(2019, 12, 11, 4, 32, 45)
-        (then, now) = self.rate_limit.get_period()
+        (then, now) = self.rate_limit.get_timeframe()
         self.assertEqual(then, timezone.datetime(2019, 12, 11, 3, 32, 45))
         self.assertEqual(now, timezone.datetime(2019, 12, 11, 4, 32, 45))
 
     @mock.patch("django.utils.timezone.now")
-    def test_get_period_block_hour(self, mock_now):
-        self.rate_limit.type = RateLimit.BLOCK
+    def test_get_timeframe_block_hour(self, mock_now):
+        self.rate_limit.type = RateLimit.BLOCK_PERIOD
         self.rate_limit.save()
         mock_now.return_value = timezone.datetime(2019, 12, 11, 4, 32, 45)
-        (then, now) = self.rate_limit.get_period()
+        (then, now) = self.rate_limit.get_timeframe()
         self.assertEqual(then, timezone.datetime(2019, 12, 11, 4, 0, 0))
         self.assertEqual(now, timezone.datetime(2019, 12, 11, 4, 32, 45))
 
     @mock.patch("django.utils.timezone.now")
-    def test_get_period_block_day(self, mock_now):
-        self.rate_limit.type = RateLimit.BLOCK
-        self.rate_limit.block = RateLimit.DAY
+    def test_get_timeframe_block_day(self, mock_now):
+        self.rate_limit.type = RateLimit.BLOCK_PERIOD
+        self.rate_limit.block_period = RateLimit.DAY
         self.rate_limit.save()
         mock_now.return_value = timezone.datetime(2019, 12, 11, 4, 32, 45)
-        (then, now) = self.rate_limit.get_period()
+        (then, now) = self.rate_limit.get_timeframe()
         self.assertEqual(then, timezone.datetime(2019, 12, 11, 0, 0, 0))
         self.assertEqual(now, timezone.datetime(2019, 12, 11, 4, 32, 45))
 
     @mock.patch("django.utils.timezone.now")
-    def test_get_period_block_week(self, mock_now):
-        self.rate_limit.type = RateLimit.BLOCK
-        self.rate_limit.block = RateLimit.WEEK
+    def test_get_timeframe_block_week(self, mock_now):
+        self.rate_limit.type = RateLimit.BLOCK_PERIOD
+        self.rate_limit.block_period = RateLimit.WEEK
         self.rate_limit.save()
         mock_now.return_value = timezone.datetime(2019, 12, 11, 4, 32, 45)
-        (then, now) = self.rate_limit.get_period()
+        (then, now) = self.rate_limit.get_timeframe()
         self.assertEqual(then, timezone.datetime(2019, 12, 8, 0, 0, 0))
         self.assertEqual(now, timezone.datetime(2019, 12, 11, 4, 32, 45))
 
     @mock.patch("django.utils.timezone.now")
-    def test_get_period_block_month(self, mock_now):
-        self.rate_limit.type = RateLimit.BLOCK
-        self.rate_limit.block = RateLimit.MONTH
+    def test_get_timeframe_block_month(self, mock_now):
+        self.rate_limit.type = RateLimit.BLOCK_PERIOD
+        self.rate_limit.block_period = RateLimit.MONTH
         self.rate_limit.save()
         mock_now.return_value = timezone.datetime(2019, 12, 11, 4, 32, 45)
-        (then, now) = self.rate_limit.get_period()
+        (then, now) = self.rate_limit.get_timeframe()
+        self.assertEqual(then, timezone.datetime(2019, 12, 1, 0, 0, 0))
+        self.assertEqual(now, timezone.datetime(2019, 12, 11, 4, 32, 45))
+
+    @mock.patch("django.utils.timezone.now")
+    def test_check_service_good(self, mock_now):
+        self.rate_limit.type = RateLimit.BLOCK_PERIOD
+        self.rate_limit.block_period = RateLimit.MONTH
+        self.rate_limit.save()
+        mock_now.return_value = timezone.datetime(2019, 12, 11, 4, 32, 45)
+        (then, now) = self.rate_limit.get_timeframe()
         self.assertEqual(then, timezone.datetime(2019, 12, 1, 0, 0, 0))
         self.assertEqual(now, timezone.datetime(2019, 12, 11, 4, 32, 45))
 

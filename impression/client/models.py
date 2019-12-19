@@ -4,6 +4,11 @@ from django.db.utils import Error as DBError
 from ..settings import get_setting
 
 
+class RemoteImpressionServerQuerySet(models.QuerySet):
+    def get_by_natural_key(self, name):
+        return self.get(name=name)
+
+
 class RemoteImpressionServer(models.Model):
     """
     Contains remote server definitions with authentication tokens. Impression will use
@@ -18,8 +23,13 @@ class RemoteImpressionServer(models.Model):
     )
     authentication_token = models.CharField(max_length=255, blank=False)
 
+    objects = RemoteImpressionServerQuerySet.as_manager()
+
     def __str__(self):
         return self.name
+
+    def natural_key(self):
+        return (self.name,)
 
     @classmethod
     def get_target_and_token(cls):

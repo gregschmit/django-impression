@@ -1,8 +1,8 @@
-from django.contrib import admin
 from django.urls import include, path
 
+from impression.admin_ui.sites import custom_admin_site
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path("admin/", custom_admin_site.urls),
     path("api/", include("impression.api.urls")),
 ]

@@ -1,0 +1,62 @@
+/**
+ * Theme for Impression
+ *  Darker BG: #2c3531
+ *  Dark BG: #116466
+ *  Dark BG lightened: #217476
+ *  Light BG: #1a999c
+ *  Light BG lightened: #2aa9ac
+ *  Light Text: #cdcdcd
+ */
+
+/* header text colors */
+#header .login #header h1 a, #branding h1, #branding h1 a:link, #branding h1 a:visited {
+  color: #cdcdcd;
+}
+
+/* top bar */
+#header {
+  background: #2c3531;
+}
+
+/* modules/breadcrumbs */
+.module h2,
+.module caption,
+.inline-group h2,
+div.breadcrumbs {
+  background: #116466;
+}
+
+/* buttons */
+.button,
+input[type="submit"],
+input[type="button"],
+.submit-row input,
+a.button {
+  background: #2aa9ac;
+}
+
+/* button hover */
+.object-tools li a:hover,
+.button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover,
+.submit-row input:hover,
+a.button:hover {
+  background: #1a999c;
+}
+
+/* button main/default +hover */
+input[type="submit"].default {
+  background: #217476;
+}
+input[type="submit"].default:hover {
+  background: #116466;
+}
+
+a:link, a:visited {
+  color: #2c3531;
+}
+
+.calendar caption, .calendarbox h2 {
+  background-color: #f5dd5d;
+}

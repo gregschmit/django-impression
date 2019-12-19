@@ -7,18 +7,31 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='RemoteImpressionServer',
+            name="RemoteImpressionServer",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255, unique=True)),
-                ('is_active', models.BooleanField(default=True)),
-                ('target', models.CharField(default='http://127.0.0.1:8000/api/send_message/', max_length=255)),
-                ('authentication_token', models.CharField(max_length=255)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=255, unique=True)),
+                ("is_active", models.BooleanField(default=True)),
+                (
+                    "target",
+                    models.CharField(
+                        default="http://127.0.0.1:8000/api/send_message/",
+                        max_length=255,
+                    ),
+                ),
+                ("authentication_token", models.CharField(max_length=255)),
             ],
         ),
     ]

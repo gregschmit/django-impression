@@ -1,3 +1,4 @@
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
 
 from rest_framework import permissions, status
@@ -51,22 +52,22 @@ class SendMessageAPIView(APIView):
         if not request.user.groups.filter(pk__in=allowed_groups):
             raise PermissionDenied()
 
+        # extract FROM email
+        from_email = request.data.get("from", None)
+        if from_email:
+            from_email, _ = EmailAddress.get_or_create(from_email)
+
         # build message
         message = Message(
             service=service,
+            override_from_email_address=from_email,
             subject=request.data.get("subject", "") or "",
             body=request.data.get("body", "") or "",
         )
-        from_email = request.data.get("from", None)
-        if from_email:
-            (
-                message.override_from_email_address,
-                created,
-            ) = EmailAddress.objects.get_or_create(
-                email_address=EmailAddress.extract_display_email(from_email)
-            )
-            if get_setting("IMPRESSION_DEFAULT_UNSUBSCRIBED") and created:
-                message.override_from_email_address.update(unsubscribed_from_all=True)
+
+        # associate message with user
+        message.user_type = ContentType.objects.get_for_model(request.user)
+        message.user_id = request.user.pk
 
         # try saving, handling RateLimitException
         try:
@@ -74,21 +75,16 @@ class SendMessageAPIView(APIView):
         except RateLimitException:
             raise Throttled(detail="Rate limit has been reached!")
 
-        # convert email strings to email objects
-        to_l = EmailAddress.filter_unsubscribed(
-            EmailAddress.convert_emails(request.data.get("to", [])), service
-        )
-        cc_l = EmailAddress.filter_unsubscribed(
-            EmailAddress.convert_emails(request.data.get("cc", [])), service
-        )
-        bcc_l = EmailAddress.filter_unsubscribed(
-            EmailAddress.convert_emails(request.data.get("bcc", [])), service
-        )
-
         # add emails to the message
-        message.extra_to_email_addresses.add(*to_l)
-        message.extra_cc_email_addresses.add(*cc_l)
-        message.extra_bcc_email_addresses.add(*bcc_l)
+        message.extra_to_email_addresses.add(
+            *EmailAddress.convert_emails(request.data.get("to", []))
+        )
+        message.extra_cc_email_addresses.add(
+            *EmailAddress.convert_emails(request.data.get("cc", []))
+        )
+        message.extra_bcc_email_addresses.add(
+            *EmailAddress.convert_emails(request.data.get("bcc", []))
+        )
 
         # signal message can be sent
         message.ready_to_send = True

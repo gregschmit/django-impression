@@ -64,5 +64,6 @@ class RemoteEmailBackend(BaseEmailBackend):
         count = 0
         for msg in email_messages:
             response = self.send_message(msg)
+            print(response.text)
             count += response.ok
         return count
