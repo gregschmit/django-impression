@@ -4,6 +4,8 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.mail import EmailMessage, get_connection
 from django.db import models
+from django.template.context import Context
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from .email_address import EmailAddress
@@ -15,13 +17,8 @@ class Message(models.Model):
     Represents an email message assigned to a service.
     """
 
-    subject = models.CharField(max_length=255, blank=True)
-    body = models.TextField(
-        blank=True,
-        help_text=_(
-            "This can be either a single string, or an encoded JSON to pass arguments "
-            "to the service."
-        ),
+    service = models.ForeignKey(
+        "impression.Service", on_delete=models.CASCADE, related_name="messages"
     )
     user_type = models.ForeignKey(
         ContentType,
@@ -29,14 +26,25 @@ class Message(models.Model):
         null=True,
         default=None,
         on_delete=models.SET_NULL,
-        help_text=_("The user model that this message is associated with."),
+        help_text=_("The type of the user that this message is associated with."),
     )
     user_id = models.PositiveIntegerField(
-        _("User ID"), blank=True, null=True, default=None
+        _("User ID"),
+        blank=True,
+        null=True,
+        default=None,
+        help_text=_("The ID of the user that this message is associated with."),
     )
     user = GenericForeignKey("user_type", "user_id")
-    service = models.ForeignKey(
-        "impression.Service", on_delete=models.CASCADE, related_name="messages"
+
+    # core message content
+    subject = models.CharField(max_length=255, blank=True)
+    body = models.TextField(
+        blank=True,
+        help_text=_(
+            "This can be either a single string, or an encoded JSON to pass arguments "
+            "to the service."
+        ),
     )
     override_from_email_address = models.ForeignKey(
         "impression.EmailAddress",
@@ -64,19 +72,23 @@ class Message(models.Model):
         related_name="message_extra_bcc_set",
         verbose_name=_("Extra BCC"),
     )
+
+    # meta-data properties
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
     ready_to_send = models.BooleanField(default=False)
     sent = models.DateTimeField(blank=True, null=True)
     last_attempt = models.DateTimeField(blank=True, null=True)
 
-    # final meta attributes (saved when message is sent)
+    # meta-data for after the message is sent
+    final_subject = models.TextField(_("Subject (final)"), blank=True, editable=False)
+    final_body = models.TextField(_("Body (final)"), blank=True, editable=False)
     final_from_email_address = models.ForeignKey(
         "impression.EmailAddress",
         blank=True,
         null=True,
         related_name="message_final_from_set",
-        verbose_name=_("From (Final)"),
+        verbose_name=_("From (final)"),
         on_delete=models.SET_NULL,
         editable=False,
     )
@@ -84,25 +96,23 @@ class Message(models.Model):
         "impression.EmailAddress",
         blank=True,
         related_name="message_final_to_set",
-        verbose_name=_("Final To"),
+        verbose_name=_("To (final)"),
         editable=False,
     )
     final_cc_email_addresses = models.ManyToManyField(
         "impression.EmailAddress",
         blank=True,
         related_name="message_final_cc_set",
-        verbose_name=_("Final CC"),
+        verbose_name=_("CC (final)"),
         editable=False,
     )
     final_bcc_email_addresses = models.ManyToManyField(
         "impression.EmailAddress",
         blank=True,
         related_name="message_final_bcc_set",
-        verbose_name=_("Final BCC"),
+        verbose_name=_("BCC (final)"),
         editable=False,
     )
-    final_subject = models.TextField(blank=True, editable=False)
-    final_body = models.TextField(blank=True, editable=False)
 
     def __str__(self):
         return str(self.id)
@@ -129,21 +139,57 @@ class Message(models.Model):
         if self.ready_to_send and not self.sent and not self.last_attempt:
             self.send()
 
-    def get_final_emails(self, kind="to"):
+    def get_user_display(self):
+        """
+        Get a string representation of the `user` generic foreign key.
+        """
+        if not self.user:
+            return ""
+        return "{} ({}, {})".format(self.user, self.user_type, self.user_id)
+
+    def get_from_email(self):
+        """
+        Return the proper "FROM" EmailAddress object. If the service allows the message
+        to override the FROM email, then use the `override_from_email_address`,
+        otherwise use the service's `from_email_address`, or if that is None, use the
+        setting `DEFAULT_FROM_EMAIL`
+        """
+        # override the email if permitted
+        if self.override_from_email_address and self.service.allow_override_email_from:
+            return self.override_from_email_address
+
+        # use the service default
+        if self.service.from_email_address:
+            return self.service.from_email_address
+
+        # last resort, use the DEFAULT_FROM_EMAIL
+        return EmailAddress.get_or_create(get_setting("DEFAULT_FROM_EMAIL"))[0]
+
+    def _get_final_emails_by_kind(self, initial_set, kind="to"):
+        """
+        Intersect the initial_set with the extra emails on this message (per the kind),
+        and then filter the unsubscribed emails.
+
+        Return a set of EmailAddress objects.
+        """
+        return self.service.filter_unsubscribed(
+            initial_set
+            | set(getattr(self, "extra_{}_email_addresses".format(kind)).all())
+        )
+
+    def get_final_emails(self):
         """
         Collect the union of emails from this message and the service, and ensure
         that unsubscribed emails are filtered out.
 
-        Return an iterable of email address strings.
+        Return a tuple of sets of EmailAddress objects in the form (to, cc, bcc).
         """
-        final_set = self.service.collect_email_addresses_by_kind(kind)
-        final_set |= set(
-            [
-                EmailAddress.get_or_create(e)[0]
-                for e in getattr(self, "extra_{}_email_addresses".format(kind))
-            ]
+        to, cc, bcc = self.service.collect_email_addresses()
+        return (
+            self._get_final_emails_by_kind(to, "to"),
+            self._get_final_emails_by_kind(cc, "cc"),
+            self._get_final_emails_by_kind(bcc, "bcc"),
         )
-        return [e.email_address for e in self.service.filter_unsubscribed(final_set)]
 
     def get_context(self):
         """
@@ -181,13 +227,15 @@ class Message(models.Model):
         subject, body = self.render()
 
         # build the email message
+        to, cc, bcc = self.get_final_emails()
+        from_email = self.get_from_email()
         email = EmailMessage(
             subject=subject,
             body=body,
-            from_email=self.override_from_email_address,
-            to=self.extra_to_email_addresses.all(),
-            cc=self.extra_cc_email_addresses.all(),
-            bcc=self.extra_bcc_email_addresses.all(),
+            from_email=from_email,
+            to=[e.email_address for e in to],
+            cc=[e.email_address for e in cc],
+            bcc=[e.email_address for e in bcc],
             connection=connection,
         )
 
@@ -196,6 +244,12 @@ class Message(models.Model):
         if email.send():
             self.sent = timezone.now()
 
-            # store the final message details
+            # store the final sent message details
+            self.final_from_email_address = from_email
+            self.final_to_email_addresses.add(*to)
+            self.final_cc_email_addresses.add(*cc)
+            self.final_bcc_email_addresses.add(*bcc)
+            self.final_subject = subject
+            self.final_body = body
 
         self.save()

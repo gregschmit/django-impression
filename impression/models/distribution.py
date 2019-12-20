@@ -22,8 +22,8 @@ class Distribution(models.Model):
 
     def collect_email_addresses(self, already_collected=None):
         """
-        Collect emails and distributions, using the ``collect_distribution`` recursive
-        method for distributions, and return a set of emails.
+        Collect emails and distributions, recursively. Return a set of EmailAddress
+        objects.
         """
         if not already_collected:
             already_collected = set([self])

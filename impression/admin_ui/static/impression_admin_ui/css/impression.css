@@ -53,9 +53,17 @@ input[type="submit"].default:hover {
   background: #116466;
 }
 
+/* adjust link colors */
 a:link, a:visited {
   color: #2c3531;
 }
+fieldset.collapse.collapsed a:link, fieldset.collapse.collapsed a:visited {
+  color: #2c3531;
+}
+fieldset.collapse a:link, fieldset.collapse a:visited {
+  color: #cdcdcd;
+}
+
 
 .calendar caption, .calendarbox h2 {
   background-color: #f5dd5d;

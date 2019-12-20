@@ -82,10 +82,94 @@ class MessageAdmin(admin.ModelAdmin):
     search_fields = ("subject",)
     list_display = (
         "id",
-        "subject",
         "service",
+        "subject",
         "created",
+        "updated",
         "ready_to_send",
         "sent",
         "last_attempt",
     )
+    fieldsets_without_readonly = (
+        (None, {"fields": ("service",)}),
+        (
+            "Message Details",
+            {
+                "fields": (
+                    "subject",
+                    "body",
+                    "override_from_email_address",
+                    "extra_to_email_addresses",
+                    "extra_cc_email_addresses",
+                    "extra_bcc_email_addresses",
+                )
+            },
+        ),
+        ("Meta", {"fields": ("ready_to_send", "sent", "last_attempt")}),
+    )
+    fieldsets = (
+        (None, {"fields": ("service", "_user_display")}),
+        (
+            "Message Details",
+            {
+                "fields": (
+                    "subject",
+                    "body",
+                    "override_from_email_address",
+                    "extra_to_email_addresses",
+                    "extra_cc_email_addresses",
+                    "extra_bcc_email_addresses",
+                )
+            },
+        ),
+        (
+            "Meta",
+            {
+                "fields": (
+                    "created",
+                    "updated",
+                    "ready_to_send",
+                    "sent",
+                    "last_attempt",
+                ),
+            },
+        ),
+        (
+            "Final Properties",
+            {
+                "classes": ("collapse",),
+                "fields": (
+                    "final_subject",
+                    "final_body",
+                    "final_from_email_address",
+                    "final_to_email_addresses",
+                    "final_cc_email_addresses",
+                    "final_bcc_email_addresses",
+                ),
+            },
+        ),
+    )
+    readonly_fields = (
+        "_user_display",
+        "created",
+        "updated",
+        "final_subject",
+        "final_body",
+        "final_from_email_address",
+        "final_to_email_addresses",
+        "final_cc_email_addresses",
+        "final_bcc_email_addresses",
+    )
+
+    def get_fieldsets(self, request, obj=None):
+        """
+        Hook for specifying fieldsets. Modified to use `fieldsets_without_readonly`.
+        """
+        if not obj:
+            return self.fieldsets_without_readonly
+        return super().get_fieldsets(request, obj=obj)
+
+    def _user_display(self, obj):
+        return obj.get_user_display()
+
+    _user_display.short_description = "User"

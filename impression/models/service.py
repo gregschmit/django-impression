@@ -132,17 +132,7 @@ class Service(models.Model):
     def natural_key(self):
         return (self.name,)
 
-    def collect_email_addresses(self):
-        """
-        Expand the distributions and return a tuple of sets (to, cc, bcc).
-        """
-        return (
-            collect_email_addresses_by_kind("to"),
-            collect_email_addresses_by_kind("cc"),
-            collect_email_addresses_by_kind("bcc"),
-        )
-
-    def collect_email_addresses_by_kind(self, kind="to"):
+    def _collect_email_addresses_by_kind(self, kind="to"):
         """
         Expand the distributions and return a set of emails, given a `kind` which should
         be one of: "to", "cc", or "bcc".
@@ -152,23 +142,16 @@ class Service(models.Model):
             s |= d.collect_email_addresses()
         return s
 
-    def get_from_email(self, override_email=None):
+    def collect_email_addresses(self):
         """
-        Return the `override_email` if this service permits, otherwise the
-        `default_from_email` or as a last resort, the settings `DEFAULT_FROM_EMAIL`.
+        Collect all the email addresses, expanding the distributions and returnning a
+        tuple of sets in the form (to, cc, bcc).
         """
-        # override the email if permitted
-        if override_email and self.allow_override_email_from:
-            if isinstance(override_email, EmailAddress):
-                return override_email
-            return EmailAddress.get_or_create(override_email)[0]
-
-        # use the service default
-        if self.default_from_email:
-            return self.default_from_email
-
-        # last resort, use the DEFAULT_FROM_EMAIL
-        return EmailAddress.get_or_create(get_setting("DEFAULT_FROM_EMAIL"))[0]
+        return (
+            self._collect_email_addresses_by_kind("to"),
+            self._collect_email_addresses_by_kind("cc"),
+            self._collect_email_addresses_by_kind("bcc"),
+        )
 
     def get_template(self):
         """
@@ -185,10 +168,11 @@ class Service(models.Model):
             return True
         return self.rate_limit.check_service(self, user, groups)
 
-    def filter_unsubscribed(self, emails):
+    def filter_unsubscribed(self, email_set):
         """
-        Filter out emails which are unsubscribed.
+        Filter out emails which are unsubscribed. Return a filtered set of EmailAddress
+        objects.
         """
         if self.is_unsubscribable:
-            return [e for e in emails if not e.is_unsubscribed_from(self)]
+            return {e for e in email_set if not e.is_unsubscribed_from(self)}
         return emails
