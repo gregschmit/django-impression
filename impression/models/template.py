@@ -22,6 +22,11 @@ class DefaultTemplate:
         )
 
 
+class TemplateQuerySet(models.QuerySet):
+    def get_by_natural_key(self, name):
+        return self.get(name=name)
+
+
 class Template(models.Model):
     """
     Represents an email template, written in the Django Template Language.
@@ -49,6 +54,8 @@ class Template(models.Model):
             url="https://docs.djangoproject.com/en/dev/ref/templates/language/"
         )
     )
+
+    objects = TemplateQuerySet.as_manager()
 
     def __str__(self):
         return self.name

@@ -64,9 +64,6 @@ class RateLimit(models.Model):
     def __str__(self):
         return self.name
 
-    def natural_key(self):
-        return (self.name,)
-
     def get_timeframe(self, now=None):
         """
         Get a start and end datetime object (timezone aware) for the time frame we

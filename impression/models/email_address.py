@@ -33,9 +33,6 @@ class EmailAddress(models.Model):
     def __str__(self):
         return self.email_address
 
-    def natural_key(self):
-        return (self.email_address,)
-
     def clean(self):
         # lowercase the email address
         self.email_address = self.email_address.lower()

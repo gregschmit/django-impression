@@ -3,8 +3,6 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from ..settings import get_setting
-
 
 class ServiceQuerySet(models.QuerySet):
     def get_by_natural_key(self, name):
@@ -128,9 +126,6 @@ class Service(models.Model):
 
     def __str__(self):
         return self.name
-
-    def natural_key(self):
-        return (self.name,)
 
     def _collect_email_addresses_by_kind(self, kind="to"):
         """

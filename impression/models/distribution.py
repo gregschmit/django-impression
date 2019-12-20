@@ -17,9 +17,6 @@ class Distribution(models.Model):
 
     objects = DistributionQuerySet.as_manager()
 
-    def natural_key(self):
-        return (self.name,)
-
     def collect_email_addresses(self, already_collected=None):
         """
         Collect emails and distributions, recursively. Return a set of EmailAddress
