@@ -39,14 +39,14 @@ class TemplateTestCase(TestCase):
         self.template = Template.objects.create(
             name="Test Template",
             subject="Test Subject",
-            body="Test Body: {{ content }}",
+            body_html="Test Body: {{ content }}",
             extends=None,
         )
 
     def test_constructor_properties(self):
         self.assertEqual(self.template.name, "Test Template")
         self.assertEqual(self.template.subject, "Test Subject")
-        self.assertEqual(self.template.body, "Test Body: {{ content }}")
+        self.assertEqual(self.template.body_html, "Test Body: {{ content }}")
         self.assertIsNone(self.template.extends)
 
 

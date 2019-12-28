@@ -14,7 +14,12 @@ setup(
     name="django-impression",
     version=impression.__version__,
     packages=find_packages(),
-    install_requires=["Django>=2", "djangorestframework>=3", "requests>=2"],
+    install_requires=[
+        "Django>=2",
+        "djangorestframework>=3",
+        "django-impression-client",
+        "beautifulsoup4>=4.4",
+    ],
     description="CMS for email; admin UI, API, and permissions for email templates.",
     long_description=long_description,
     url="https://github.com/gregschmit/django-impression",

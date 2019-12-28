@@ -1,9 +1,8 @@
 from django.contrib import admin
-from django.db.models import TextField
 from django.utils.translation import gettext_lazy as _
 
 from . import models
-from .widgets import TemplateEditorWidget
+from .forms import TemplateForm
 
 
 @admin.register(models.EmailAddress)
@@ -18,7 +17,23 @@ class TemplateAdmin(admin.ModelAdmin):
     list_filter = ("extends",)
     search_fields = ("subject", "body", "extends")
     list_display = ("name", "subject", "extends")
-    formfield_overrides = {TextField: {"widget": TemplateEditorWidget}}
+    form = TemplateForm
+
+    def change_view(self, *args, **kwargs):
+        """
+        Cache the pk so ``formfield_for_foreignkey`` can exclude it.
+        """
+        self._pk = kwargs.get("object_id", None)
+        return super().change_view(*args, **kwargs)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """
+        Exclude self-referential fk.
+        """
+        if db_field.name == "extends":
+            if self._pk:
+                kwargs["queryset"] = models.Template.objects.exclude(pk=self._pk)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 @admin.register(models.Distribution)
@@ -140,7 +155,8 @@ class MessageAdmin(admin.ModelAdmin):
                 "classes": ("collapse",),
                 "fields": (
                     "final_subject",
-                    "final_body",
+                    "final_body_html",
+                    "final_body_plaintext",
                     "final_from_email_address",
                     "final_to_email_addresses",
                     "final_cc_email_addresses",
@@ -154,7 +170,8 @@ class MessageAdmin(admin.ModelAdmin):
         "created",
         "updated",
         "final_subject",
-        "final_body",
+        "final_body_html",
+        "final_body_plaintext",
         "final_from_email_address",
         "final_to_email_addresses",
         "final_cc_email_addresses",

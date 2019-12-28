@@ -118,21 +118,8 @@ just add this entry to your URL dispatcher's ``urlpatterns`` list:
 Remote
 ------
 
-For remote systems that will talk to your Impression server over the REST API, then do
-not include ``impression`` in your ``INSTALLED_APPS``, but do add ``django-impression``
-to your requirements to ensure it's installed in the environment. Configure your
-settings like this:
-
-.. code-block:: python
-
-    EMAIL_BACKEND = "impression.client.backends.RemoteEmailBackend"
-    IMPRESSION_DEFAULT_TARGET = "https://impression.example.org/api/send_message/"
-    IMPRESSION_DEFAULT_TOKEN = "my_api_auth_token_here"
-
-If you want to store your credentials in the database rather than statically in your
-project ``settings.py`` file, include ``impression.client`` in your ``INSTALLED_APPS``,
-then run database migrations, and finally remove the ``IMPRESSION_DEFAULT_TARGET`` and
-``IMPRESSION_DEFAULT_TOKEN`` from your project ``settings.py``.
+For remote systems that will talk to your Impression server over the REST API, use the
+`Impression Client <https://github.com/gregschmit/django-impression-client>`_.
 
 
 Installing as Standalone System (+Docker)

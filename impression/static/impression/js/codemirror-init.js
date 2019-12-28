@@ -10,10 +10,18 @@ document.addEventListener("DOMContentLoaded", function() {
       }
     });
 
+    /* select mode from attached class */
+    var mode = 0;
+    if (el.classList.contains('impression-mode-django')) {
+      mode = 'text/x-django';
+    } else {
+      console.log("ImpressionEditor: No mode found!");
+    }
+
     /* build code mirror text area */
     var cm = CodeMirror.fromTextArea(el, {
       lineNumbers: true,
-      mode: 'django',
+      mode: mode,
       indentUnit: 2,
       smartIndent: true,
       tabSize: 2,

@@ -2,7 +2,7 @@ import json
 
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.core.mail import EmailMessage, get_connection
+from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db import models
 from django.template.context import Context
 from django.utils import timezone
@@ -42,8 +42,8 @@ class Message(models.Model):
     body = models.TextField(
         blank=True,
         help_text=_(
-            "This can be either a single string, or an encoded JSON to pass arguments "
-            "to the service."
+            "This can be a JSON string to pass arguments to the service, if the service"
+            " allows."
         ),
     )
     override_from_email_address = models.ForeignKey(
@@ -82,7 +82,12 @@ class Message(models.Model):
 
     # meta-data for after the message is sent
     final_subject = models.TextField(_("Subject (final)"), blank=True, editable=False)
-    final_body = models.TextField(_("Body (final)"), blank=True, editable=False)
+    final_body_plaintext = models.TextField(
+        _("Body (plaintext, final)"), blank=True, editable=False
+    )
+    final_body_html = models.TextField(
+        _("Body (HTML, final)"), blank=True, editable=False
+    )
     final_from_email_address = models.ForeignKey(
         "impression.EmailAddress",
         blank=True,
@@ -224,20 +229,22 @@ class Message(models.Model):
         connection = get_connection(backend)
 
         # compile the message using the template, extract other properties
-        subject, body = self.render()
+        subject, plaintext_body, html_body = self.render()
 
         # build the email message
         to, cc, bcc = self.get_final_emails()
         from_email = self.get_from_email()
-        email = EmailMessage(
+        email = EmailMultiAlternatives(
             subject=subject,
-            body=body,
+            body=plaintext_body,
             from_email=from_email,
             to=[e.email_address for e in to],
             cc=[e.email_address for e in cc],
             bcc=[e.email_address for e in bcc],
             connection=connection,
         )
+        if html_body:
+            email.attach_alternative(html_body, "text/html")
 
         # send the message
         self.last_attempt = timezone.now()
@@ -250,6 +257,7 @@ class Message(models.Model):
             self.final_cc_email_addresses.add(*cc)
             self.final_bcc_email_addresses.add(*bcc)
             self.final_subject = subject
-            self.final_body = body
+            self.final_body_plaintext = plaintext_body or ""
+            self.final_body_html = html_body or ""
 
         self.save()

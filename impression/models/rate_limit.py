@@ -57,7 +57,9 @@ class RateLimit(models.Model):
     )
     BLOCK_PERIOD_NAME = {id: name for id, name in BLOCK_PERIOD_CHOICES}
     block_period = models.IntegerField(choices=BLOCK_PERIOD_CHOICES, default=HOUR)
-    rolling_window = models.DurationField(default=timezone.timedelta(hours=1))
+    rolling_window = models.DurationField(
+        default=timezone.timedelta(hours=1), help_text=_("[DD] HH:MM:SS")
+    )
 
     objects = RateLimitQuerySet.as_manager()
 

@@ -30,7 +30,7 @@ IMPRESSION_DEFAULT_TOKEN = ""
 IMPRESSION_DEFAULT_UNSUBSCRIBED = False
 
 EMAIL_BACKEND = "impression.backends.LocalEmailBackend"
-EMAIL_BACKEND = "impression.client.backends.RemoteEmailBackend"  # for testing the API
+EMAIL_BACKEND = "impression_client.backends.RemoteEmailBackend"  # for testing the API
 
 
 # standalone settings
@@ -39,8 +39,8 @@ SECRET_KEY = "not-a-very-good-secret"
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
 INSTALLED_APPS = [
+    "impression_client",
     "impression",
-    "impression.client",
     "impression.admin_ui",
     "django.contrib.admin",
     "django.contrib.auth",
