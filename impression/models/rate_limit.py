@@ -136,6 +136,12 @@ class RateLimit(models.Model):
             ).count()
         elif self.grouping == self.PER_GROUP and groups:
             count = max([base_query.filter(user__groups=g).count() for g in groups])
-        else:
+        elif self.grouping == self.TOTAL:
             count = base_query.count()
+        else:
+            raise ValueError(
+                "self.grouping is not a valid value (bad value {} for obj {})".format(
+                    self.grouping, self.pk
+                )
+            )
         return count < self.quantity

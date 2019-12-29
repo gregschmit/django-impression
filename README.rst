@@ -48,8 +48,12 @@ Key Features:
 
 - Email templates are editable by users in the UI.
 - API endpoints allow remote systems to send emails.
+- API requests can contain a JSON for the "email body" which allows clean separation
+  between the content (data sent by the remote system) and the presentation (defined by
+  the Impression templates).
 - Impression is protected by a system of semi-trust, where you can apply rate limits on
-  the systems which use Impression, and control the content and format of emails.
+  the systems which use Impression, constrain which services/templates each remote
+  system has access to, and control the format of the emails that are sent.
 
 
 Architectures
