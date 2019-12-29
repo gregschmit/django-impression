@@ -83,7 +83,8 @@ Configuration
 *************
 
 Whether you are going to run Impression from your existing project locally, or whether
-you are going to integrate your existing project with a standalone Impression system: affects how you should configure
+you are going to integrate your existing project with a standalone Impression system
+affects how you should configure
 the settings.
 
 There are 2 configuration schemes:
@@ -94,7 +95,7 @@ There are 2 configuration schemes:
   even another project running on the same system, in which case you'll use localhost.)
 
 Local
-=====
+-----
 
 Add ``impression`` to your ``INSTALLED_APPS``, run migrations, and configure some
 settings:
@@ -122,12 +123,15 @@ For remote systems that will talk to your Impression server over the REST API, u
 `Impression Client <https://github.com/gregschmit/django-impression-client>`_.
 
 
-Installing as Standalone System (+Docker)
-=========================================
+Installing as Standalone System
+*******************************
+
+It's a very good idea to setup a dedicated Django application on a server for your
+organization (then all of your apps can use that system remotely).
 
 To make things really easy, if you have a Docker or Virtual environment, or just wish to
 spin Impression up on it's own server, you can check out
-`Impression Sys <https://github.com/gregschmit/impression_sys>`_ to deploy Impression as
+`ImpressionOS <https://github.com/gregschmit/impression_os>`_ to deploy Impression as
 a standalone system. That project provides the ability to configure everything about the
 system in the Admin UI, and even configure Let's Encrypt certificates to ensure your
 email API is secure.
