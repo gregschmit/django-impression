@@ -44,6 +44,13 @@ centralize your email brand and keep things looking awesome and consistent. You 
 Impression in an existing project, or you can run it standalone by itself (e.g.,
 ``impression.example.com``).
 
+Key Features:
+
+- Email templates are editable by users in the UI.
+- API endpoints allow remote systems to send emails.
+- Impression is protected by a system of semi-trust, where you can apply rate limits on
+  the systems which use Impression, and control the content and format of emails.
+
 
 Architectures
 #############
@@ -56,7 +63,7 @@ There are a few ways to integrate Impression into an environment:
 
   - You have more than 1 web application operating in your ecosystem and want to
     centralize your email templating within your organization.
-  - You have a fleet of systems in the hands of customers (untrusted users) to whom
+  - You have a fleet of systems in the hands of customers (semi-trusted users) to whom
     you cannot provide your SMTP details. You want them to be able to request emails to
     be sent (e.g., for notification systems).
 
