@@ -66,12 +66,23 @@ class Service(models.Model):
             "service email configuration."
         ),
     )
-    allow_json_body = models.BooleanField(
-        default=True,
+    FORBID = "forbid"
+    PERMIT = "permit"
+    REQUIRE = "require"
+    JSON_BODY_POLICIES = (
+        (FORBID, _("forbid")),
+        (PERMIT, _("permit")),
+        (REQUIRE, _("require")),
+    )
+    json_body_policy = models.CharField(
+        _("JSON body policy"),
+        max_length=255,
+        choices=JSON_BODY_POLICIES,
+        default=FORBID,
         help_text=_(
-            "Try to decode the message body as a JSON and load into template context."
+            "Whether the message body must (require), may (permit), or may not (forbid)"
+            " be decoded as a JSON and loaded into template context."
         ),
-        verbose_name=_("Allow JSON body"),
     )
     template = models.ForeignKey(
         "impression.Template", blank=True, null=True, on_delete=models.SET_NULL
@@ -171,3 +182,14 @@ class Service(models.Model):
         if self.is_unsubscribable:
             return {e for e in email_set if not e.is_unsubscribed_from(self)}
         return emails
+
+    def extract_body(self, body):
+        """
+        Helper method for extracting the body, which may be a JSON, while obeying the
+        ``json_body_policy``.
+
+        Specifically, if the policy is:
+         - FORBID, then the body must be a string.
+         - PERMIT, then the body can be either a JSON string or an object.
+         - REQUIRE, then the body must be decodable as JSON or itself be an object.
+        """

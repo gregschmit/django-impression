@@ -53,13 +53,13 @@ class RateLimitAdmin(admin.ModelAdmin):
 
 @admin.register(models.Service)
 class ServiceAdmin(admin.ModelAdmin):
-    list_filter = ("is_active", "allow_json_body", "template", "from_email_address")
+    list_filter = ("is_active", "json_body_policy", "template", "from_email_address")
     search_fields = ("name",)
     list_display = (
         "name",
         "is_active",
         "is_unsubscribable",
-        "allow_json_body",
+        "json_body_policy",
         "template",
         "from_email_address",
     )

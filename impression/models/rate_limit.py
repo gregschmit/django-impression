@@ -15,15 +15,16 @@ class RateLimit(models.Model):
     """
 
     name = models.CharField(max_length=255, unique=True)
-    TOTAL = 0
-    PER_USER = 1
-    PER_GROUP = 2
+    TOTAL = "total"
+    PER_USER = "per_user"
+    PER_GROUP = "per_group"
     GROUPING_CHOICES = (
         (TOTAL, _("total")),
         (PER_USER, _("per user")),
         (PER_GROUP, _("per group")),
     )
-    grouping = models.IntegerField(
+    grouping = models.CharField(
+        max_length=255,
         choices=GROUPING_CHOICES,
         default=TOTAL,
         help_text=_(
@@ -38,17 +39,17 @@ class RateLimit(models.Model):
             "period (either block or rolling window)."
         ),
     )
-    BLOCK_PERIOD = 0
-    ROLLING_WINDOW = 1
+    BLOCK_PERIOD = "block_period"
+    ROLLING_WINDOW = "rolling_window"
     TYPE_CHOICES = (
         (BLOCK_PERIOD, _("Block Period")),
         (ROLLING_WINDOW, _("Rolling Window")),
     )
-    type = models.IntegerField(choices=TYPE_CHOICES, default=BLOCK_PERIOD)
-    HOUR = 0
-    DAY = 1
-    WEEK = 2
-    MONTH = 3
+    type = models.CharField(max_length=255, choices=TYPE_CHOICES, default=BLOCK_PERIOD)
+    HOUR = "hour"
+    DAY = "day"
+    WEEK = "week"
+    MONTH = "month"
     BLOCK_PERIOD_CHOICES = (
         (HOUR, _("per hour")),
         (DAY, _("per day")),
@@ -56,7 +57,9 @@ class RateLimit(models.Model):
         (MONTH, _("per month")),
     )
     BLOCK_PERIOD_NAME = {id: name for id, name in BLOCK_PERIOD_CHOICES}
-    block_period = models.IntegerField(choices=BLOCK_PERIOD_CHOICES, default=HOUR)
+    block_period = models.CharField(
+        max_length=255, choices=BLOCK_PERIOD_CHOICES, default=HOUR
+    )
     rolling_window = models.DurationField(
         default=timezone.timedelta(hours=1), help_text=_("[DD] HH:MM:SS")
     )
@@ -96,7 +99,7 @@ class RateLimit(models.Model):
                             return (then, now)
         raise Exception("RateLimit type or block period not known.")
 
-    def humanized_rolling_window(self):
+    def _humanized_rolling_window(self):
         """
         Human-readable summary of the rolling window.
         """
@@ -118,13 +121,13 @@ class RateLimit(models.Model):
             )
         if self.type == self.ROLLING_WINDOW:
             return "{} messages for a rolling window of: {}".format(
-                self.quantity, self.humanized_rolling_window()
+                self.quantity, self._humanized_rolling_window()
             )
 
     def check_service(self, service, user=None, groups=None):
         """
         Check the service to see if the rate limit has been reached, either in total,
-        or per user or per group, depending on the configuration.
+        per user, or per group, depending on the configuration.
 
         Return True if the rate limit has not been reached and False if it has.
         """
@@ -140,7 +143,7 @@ class RateLimit(models.Model):
             count = base_query.count()
         else:
             raise ValueError(
-                "self.grouping is not a valid value (bad value {} for obj {})".format(
+                "self.grouping is not valid (bad value {} for obj {})".format(
                     self.grouping, self.pk
                 )
             )

@@ -1,5 +1,16 @@
+class ImpressionMessageException(Exception):
+    """
+    Base exception for errors in constructing a message.
+    """
+
+
 class RateLimitException(Exception):
     """
-    This should be raised when a message cannot be constructed due to the rate limit on
-    the service.
+    The rate limit of the service has been reached.
+    """
+
+
+class JSONBodyRequired(Exception):
+    """
+    The JSON policy requires the body be a JSON object.
     """

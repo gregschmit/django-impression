@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from django.db import Q, transaction
+from django.db import transaction
 
 from ...models import Message
 
@@ -19,7 +19,7 @@ class Command(BaseCommand):
         an atomic transaction, select_for_update the message, get it from the DB, and
         then send if it still meets the requirements.
         """
-        q = Q(read_to_send=True, send__isnull=True)
+        q = Message.ready_query
         message_ids = Message.objects.filter(q).values_list("pk", flat=True)
         for message_id in message_ids:
             message_q = Message.objects.filter(pk=message_id)

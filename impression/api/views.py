@@ -1,12 +1,14 @@
+import json
+
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
 
 from rest_framework import permissions, status
-from rest_framework.exceptions import NotFound, Throttled
+from rest_framework.exceptions import NotFound, Throttled, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..exceptions import RateLimitException
+from ..exceptions import RateLimitException, JSONBodyRequired
 from ..models import EmailAddress, Message, Service
 
 
@@ -39,13 +41,13 @@ class SendMessageAPIView(APIView):
         elif "service_name" in request.data:
             service_name = request.data.get("service_name")
         else:
-            raise NotFound("Target service name not provided.")
+            raise NotFound(detail="Target service name not provided.")
 
         # resolve to service, or raise error
         try:
             service = Service.objects.get(name=service_name)
         except (Service.DoesNotExist, ValueError, TypeError):
-            raise NotFound("Target service not found.")
+            raise NotFound(detail="Target service not found.")
 
         # check for service-level permissions
         allowed_groups = service.allowed_groups.values_list("pk", flat=True)
@@ -57,12 +59,25 @@ class SendMessageAPIView(APIView):
         if from_email:
             from_email, _ = EmailAddress.get_or_create(from_email)
 
+        # check body
+        body_raw = request.data.get("body", "") or ""
+        if isinstance(body_raw, dict):
+            if service.json_body_policy == service.FORBID:
+                raise ValidationError(detail="Body cannot be a JSON object.")
+            body = json.dumps(body_raw)
+        elif isinstance(body_raw, str):
+            body = body_raw
+        else:
+            raise ValidationError(
+                detail="Body has invalid type {}".format(type(body_raw))
+            )
+
         # build message
         message = Message(
             service=service,
             override_from_email_address=from_email,
             subject=request.data.get("subject", "") or "",
-            body=request.data.get("body", "") or "",
+            body=body,
         )
 
         # associate message with user
@@ -74,6 +89,8 @@ class SendMessageAPIView(APIView):
             message.save()
         except RateLimitException:
             raise Throttled(detail="Rate limit has been reached!")
+        except JSONBodyRequired:
+            raise ValidationError(detail="Body must be a JSON object.")
 
         # add emails to the message
         message.extra_to_email_addresses.add(

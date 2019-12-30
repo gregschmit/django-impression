@@ -64,7 +64,10 @@ class EmailAddress(models.Model):
     @classmethod
     def get_or_create(cls, email_string):
         """
-        Given an email string, try to convert it to an email object.
+        Given an email string, try to convert it to an email object. Prefer to use this
+        method rather than the native interfaces for constructing/retrieving, as we want
+        to enforce some custom logic around keeping the emails lowercase'd and accepting
+        "display emails" in the form "John Doe <jdoe@example.org>".
         """
         # allow for email format variants
         email_string = cls.extract_display_email(email_string)
@@ -91,7 +94,9 @@ class EmailAddress(models.Model):
         """
         If email might be in the format ``"Fred" <fred@example.com>``, then use this
         method to extract the real email. If the email is already in the raw format,
-        then this method will still return the email address, unchanged.
+        then this method will still return the email address.
+
+        Always lower() the returned email string.
         """
         email_re = re.compile(r".*<(.*)>")
         match = email_re.fullmatch(email)

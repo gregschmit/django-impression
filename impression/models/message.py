@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from .email_address import EmailAddress
+from ..exceptions import RateLimitException, JSONBodyRequired
 from ..settings import get_setting
 
 
@@ -119,16 +120,17 @@ class Message(models.Model):
         editable=False,
     )
 
+    ready_query = models.Q(ready_to_send=True, send__isnull=True)
+
     def __str__(self):
         return str(self.id)
 
-    def save(self, *args, **kwargs):
+    def _pre_create_check(self):
         """
-        Save the message. Then, if it looks ready to send but sending hasn't been
-        attempted, acquire DB lock, and send the message.
+        Checks to be done before message is created. Raise exceptions for errors.
         """
         # check if we hit our rate limit
-        if self.pk is None and self.service.rate_limit:
+        if self.service.rate_limit:
             groups = (
                 self.user.groups.all() & self.service.allowed_groups.all()
                 if self.user
@@ -136,6 +138,34 @@ class Message(models.Model):
             )
             if not self.service.check_rate_limit(self.user, groups):
                 raise RateLimitException()
+
+        # check if the body passes the json_body_policy
+        if self.service.json_body_policy in [self.service.FORBID, self.service.PERMIT]:
+            pass
+        elif self.service.json_body_policy == self.service.REQUIRE:
+            body = {}
+            try:
+                body.update(json.loads(self.body))
+            except (json.JSONDecodeError, TypeError):  # body is not a JSON object
+                raise JSONBodyRequired()
+        else:
+            raise ValueError(
+                "json_body_policy is not valid (bad value {} for obj {})".format(
+                    self.service.json_body_policy, self.service.pk
+                )
+            )
+
+    def save(self, *args, **kwargs):
+        """
+        Save the message. Then, if it looks ready to send but sending hasn't been
+        attempted, acquire DB lock, and send the message.
+
+        For messages being created (pk=None), there are initial checks for things like
+        rate limiting and body content validity.
+        """
+        # checks before Message is created
+        if self.pk is None:
+            self._pre_create_check()
 
         # save object first
         super().save(*args, **kwargs)
@@ -204,13 +234,21 @@ class Message(models.Model):
         context = Context()
         context["subject"] = self.subject
         context["body"] = self.body
-        if self.service.allow_json_body:
+        if self.service.json_body_policy in [self.service.PERMIT, self.service.REQUIRE]:
             try:
                 context.update(json.loads(self.body))
             except json.JSONDecodeError:  # body is not a JSON
                 pass
-            except TypeError:  # result is not a dict
+            except TypeError:  # top level JSON is not an object
                 pass
+        elif self.service.json_body_policy == self.service.FORBID:
+            pass  # do not attempt to load body as JSON into context
+        else:
+            raise ValueError(
+                "json_body_policy is not valid (bad value {} for obj {})".format(
+                    self.service.json_body_policy, self.service.pk
+                )
+            )
         return context
 
     def render(self):
@@ -223,7 +261,6 @@ class Message(models.Model):
         """
         Send the message via the "real" email backend.
         """
-
         # get the "real" backend/connection
         backend = get_setting("IMPRESSION_EMAIL_BACKEND")
         connection = get_connection(backend)
